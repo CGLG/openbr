@@ -27,13 +27,15 @@
 
 //! [face_recognition]
 #include <openbr/openbr_plugin.h>
-
+#include <stdio.h>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <iostream>
+#include <string>
 using namespace cv;
 using namespace std;
 
+string type2str(int type);
 /*
 static void printTemplate(const br::Template &t)
 {
@@ -46,22 +48,55 @@ static void printTemplate(const br::Template &t)
 int main(int argc, char *argv[])
 {
     br::Context::initialize(argc, argv);
+    namedWindow("cam", WINDOW_NORMAL);
+    cv::resizeWindow("cam", 200, 200);
 
-    // Retrieve classes for enrolling and comparing templates using the FaceRecognition algorithm
-    QSharedPointer<br::Transform> transform = br::Transform::fromAlgorithm("FaceRecognition");
-    QSharedPointer<br::Distance> distance = br::Distance::fromAlgorithm("FaceRecognition");
-
-    // Initialize templates
-    br::Template queryA("0.webcam");
-    br::Template target("/data/ATT/img/s1/1.pgm");
 
     while (1) {
+    // Retrieve classes for enrolling and comparing templates using the FaceRecognition algorithm
+      QSharedPointer<br::Transform> transform = br::Transform::fromAlgorithm("FaceRecognition");
+      QSharedPointer<br::Distance> distance = br::Distance::fromAlgorithm("FaceRecognition");
+
+      // Initialize templates
+      //br::Template queryA("0.webcam");
+      string name("0.webcam");
+      Mat mat = imread(name.c_str(), IMREAD_COLOR);
+      br::Template target("/data/ATT/img/s1/1.pgm");
+
+
       // Enroll templates
-      queryA >> *transform;
+      //mat >> *transform;
 
       // show webcam
-      Mat mat = queryA.m();
+
+      //Mat mat = queryA.m();
+      if (!mat.data) {
+        cout << "no data!\n";
+      }
+//      cout << "element size: " << mat.elemSize() << endl;
+//      cout << "element size 1: " << mat.elemSize1() << endl;
       imshow("cam", mat);
+
+      /*
+      unsigned char* ptr = (unsigned char *) (mat.data);
+      int i, j, r = 0, g = 0, b = 0;
+      for (i = 0; i < mat.rows; i++) {
+        for (j = 0; j < mat.cols; j++) {
+          b = ptr[mat.step * j + i];
+          g = ptr[mat.step * j + i + 1];
+          r = ptr[mat.step * j + i + 2];
+        }
+        printf("BGR: %d, %d, %d\n", b, g, r);
+      }
+      */
+
+      string ty =  type2str( mat.type() );
+      printf("Matrix: %s %dx%d \n", ty.c_str(), mat.cols, mat.rows );
+
+
+      if (waitKey(30) >= 0) {
+          break;
+      }
 
       target >> *transform;
 
@@ -70,15 +105,36 @@ int main(int argc, char *argv[])
       //printTemplate(target);
 
       // Compare templates
-      float comparisonA = distance->compare(target, queryA);
+      //float comparisonA = distance->compare(target, queryA);
 
       // Scores range from 0 to 1 and represent match probability
-      printf("Genuine match score: %.3f\n", comparisonA);
-      if (waitKey(30) >= 0) {
-          break;
-      }
+      //printf("Genuine match score: %.3f\n", comparisonA);
+
     }
     br::Context::finalize();
     return 0;
+}
+
+string type2str(int type) {
+  string r;
+
+  uchar depth = type & CV_MAT_DEPTH_MASK;
+  uchar chans = 1 + (type >> CV_CN_SHIFT);
+
+  switch ( depth ) {
+    case CV_8U:  r = "8U"; break;
+    case CV_8S:  r = "8S"; break;
+    case CV_16U: r = "16U"; break;
+    case CV_16S: r = "16S"; break;
+    case CV_32S: r = "32S"; break;
+    case CV_32F: r = "32F"; break;
+    case CV_64F: r = "64F"; break;
+    default:     r = "User"; break;
+  }
+
+  r += "C";
+  r += (chans+'0');
+
+  return r;
 }
 //! [face_recognition]
