@@ -33,7 +33,8 @@ using namespace cv;
 // definitions from the CUDA source file
 namespace br { namespace cuda { namespace pca {
   void initializeWrapper(float* evPtr, int evRows, int evCols, float* meanPtr, int meanElems);
-  void wrapper(void* src, void** dst);
+  void trainWrapper(void* cudaSrc, float* dst, int rows, int cols);
+  void wrapper(void* src, void** dst, int imgRows, int imgCols);
 }}}
 
 namespace br
@@ -93,16 +94,18 @@ private:
           int cols = *((int*)srcDataPtr[2]);
           int type = *((int*)srcDataPtr[3]);
 
+          if (type != CV_32FC1) {
+            qFatal("Requires single channel 32-bit floating point matrices.");
+          }
+
           Mat mat = Mat(rows, cols, type);
+          br::cuda::pca::trainWrapper(cudaMemPtr, mat.ptr<float>(), rows, cols);
           trainingQlist.append(Template(mat));
         }
 
         // assemble a TemplateList from the list of data
         TemplateList trainingSet(trainingQlist);
 
-        if (trainingSet.first().m().type() != CV_32FC1) {
-          qFatal("Requires single channel 32-bit floating point matrices.");
-        }
 
         originalRows = trainingSet.first().m().rows;    // get number of rows of first image
         int dimsIn = trainingSet.first().m().rows * trainingSet.first().m().cols; // get the size of the first image
@@ -125,7 +128,7 @@ private:
 
       if (type != CV_32FC1) {
         cout << "ERR: Invalid image type" << endl;
-        return;
+        throw 0;
       }
 
       Mat dstMat = Mat(src.m().rows, src.m().cols, src.m().type());
@@ -134,7 +137,7 @@ private:
       dstDataPtr[2] = srcDataPtr[2];  *((int*)dstDataPtr[2]) = keep;
       dstDataPtr[3] = srcDataPtr[3];
 
-      cuda::pca::wrapper(srcDataPtr[0], &dstDataPtr[0]);
+      cuda::pca::wrapper(srcDataPtr[0], &dstDataPtr[0], rows, cols);
 
       dst = dstMat;
     }
@@ -148,7 +151,6 @@ private:
     {
         stream >> keep >> drop >> whiten >> originalRows >> mean >> eVals >> eVecs;
 
-        // TODO(colin): use Eigen Map class to generate map files so we don't have to copy the data
         // serialize the eigenvectors
         float* evBuffer = new float[eVecs.rows() * eVecs.cols()];
         for (int i=0; i < eVecs.rows(); i++) {
